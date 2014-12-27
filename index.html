@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>GazRos</title>
+  <link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<style type="text/css">
+  .done {
+    text-decoration: line-through;
+  }
+</style>
+ 
+<div class="container" id="todos">
+  <h1>Текущие заказы</h1>
+ 
+  <ul class="todos list-unstyled"></ul>
+  <form role="form" class="create-todo">
+    <div class="form-group">
+      <input type="text" class="form-control" name="description" placeholder="Цена Откуда-Куда Условия Контакты">
+    </div>
+    <button type="submit" class="btn btn-info col-md-12">Добавить</button>
+  </form>
+</div>
+ 
+<script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  var socket = io.connect();
+  var el = $('#todos');
+ 
+  var app = {
+    addTodo: function(todo) {
+      var html = '<li class="page-header checkbox" data-id="' + todo.id + '">' +
+            '<label><input type="checkbox" name="done">' +
+            todo.description +
+            '</label><a href="javascript://" class="pull-right delete">' +
+            '<span class="glyphicon glyphicon-remove"></span>' +
+            '</a></li>';
+ 
+      el.find('.todos').append(html);
+      app.updateTodo(todo);
+    },
+    removeTodo: function(todo) {
+      el.find('[data-id="' + todo.id + '"]').remove();
+    },
+    updateTodo: function(todo) {
+      var element = el.find('[data-id="' + todo.id + '"]');
+      var checkbox = element.find('[name="done"]').removeAttr('disabled');
+ 
+      if(todo.done) {
+        element.addClass('done');
+        checkbox.prop('checked', true);
+      } else {
+        element.removeClass('done');
+        checkbox.prop('checked', false);
+      }
+    },
+    errorHandler: function(error) {
+      if(error) {
+        alert(error.message);
+      }
+    }
+  };
+ 
+  el.on('submit', 'form', function (ev) {
+    var field = $(this).find('[name="description"]');
+ 
+    socket.emit('todos::create', {
+      description: field.val()
+    }, {}, app.errorHandler);
+ 
+    field.val('');
+    ev.preventDefault();
+  }).on('click', '.delete', function (ev) {
+    var id = $(this).parents('li').data('id');
+    socket.emit('todos::remove', id, {}, app.errorHandler);
+    ev.preventDefault();
+  }).on('click', '[name="done"]', function(ev) {
+    var id = $(this).parents('li').data('id');
+ 
+    $(this).attr('disabled', 'disabled');
+ 
+    socket.emit('todos::update', id, {
+      done: $(this).is(':checked')
+    }, {}, app.errorHandler);
+  });
+ 
+  socket.on('todos updated', app.updateTodo);
+  socket.on('todos removed', app.removeTodo);
+  socket.on('todos created', app.addTodo);
+  socket.emit('todos::find', {}, function (error, todos) {
+    todos.forEach(app.addTodo);
+  });
+</script>
+</body>
+</html> 
